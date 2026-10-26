@@ -3,6 +3,11 @@ node_modules/
 */node_modules/
 services/*/node_modules/
 
+# Documentation folders
+docs/
+*/docs/
+docs_latex/
+
 # Python Cache & Bytecode
 __pycache__/
 */__pycache__/
@@ -33,7 +38,6 @@ npm-debug.log*
 yarn-debug.log*
 
 # LaTeX source and build debris
-docs_latex/
 *.aux
 *.out
 *.toc

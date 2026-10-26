@@ -2,6 +2,10 @@
 node_modules/
 services/*/node_modules/
 
+# Documentation folders
+docs/
+*/docs/
+
 # Python Cache & Bytecode
 __pycache__/
 */__pycache__/

@@ -1,7 +1,13 @@
 from typing import Dict, Any, List
-from ..state import RunState
-from ...memory.sops import SopMemoryStore
-from ...memory.episodic import EpisodicMemoryStore
+
+try:
+    from graph.state import RunState
+    from memory.sops import SopMemoryStore
+    from memory.episodic import EpisodicMemoryStore
+except (ImportError, ValueError):
+    from ..state import RunState
+    from ...memory.sops import SopMemoryStore
+    from ...memory.episodic import EpisodicMemoryStore
 
 def recall_node(state: RunState, sop_store: SopMemoryStore, episodic_store: EpisodicMemoryStore) -> Dict[str, Any]:
     """

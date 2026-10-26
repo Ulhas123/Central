@@ -1,5 +1,9 @@
 from typing import Dict, Any, List, Optional
-from ..state import RunState
+
+try:
+    from graph.state import RunState
+except (ImportError, ValueError):
+    from ..state import RunState
 
 def plan_node(state: RunState) -> Dict[str, Any]:
     """

@@ -1,7 +1,13 @@
 from typing import Dict, Any, List
-from ..state import RunState
-from ...tools.erp_api import ErpApiClient
-from ...audit import AuditLogger
+
+try:
+    from graph.state import RunState
+    from tools.erp_api import ErpApiClient
+    from audit import AuditLogger
+except (ImportError, ValueError):
+    from ..state import RunState
+    from ...tools.erp_api import ErpApiClient
+    from ...audit import AuditLogger
 
 def verify_node(state: RunState, erp_api: ErpApiClient, audit: AuditLogger) -> Dict[str, Any]:
     """

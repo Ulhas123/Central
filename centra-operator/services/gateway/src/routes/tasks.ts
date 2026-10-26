@@ -16,10 +16,11 @@ export function createTasksRouter(queue: TaskQueueService, relay: ChangeStreamRe
     const companyId = company_id || 'COMP-001';
     const fingerprint = queue.generateFingerprint(goal, companyId);
 
-    // Idempotency / Deduplication Guard
-    if (queue.isDuplicate(fingerprint)) {
+    // Idempotency / Deduplication Guard (Debounce 5s)
+    if (!req.body.force && queue.isDuplicate(fingerprint, 5)) {
       return res.status(409).json({
-        error: 'Duplicate task submission rejected by idempotency filter',
+        error: 'Duplicate task submission debounced: this exact task was submitted in the last 5 seconds.',
+        status: 'DUPLICATE_DEBOUNCED',
         fingerprint
       });
     }
@@ -33,6 +34,12 @@ export function createTasksRouter(queue: TaskQueueService, relay: ChangeStreamRe
         goal,
         companyId
       });
+
+      if (Array.isArray(result.history)) {
+        for (const h of result.history) {
+          relay.broadcastTaskUpdate(taskId, (h.type || 'GRAPH_STEP').toUpperCase(), h);
+        }
+      }
 
       if (result.status === 'AWAITING_APPROVAL') {
         relay.broadcastInterruptRequested(taskId, result.interrupt_data);

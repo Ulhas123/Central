@@ -1,11 +1,23 @@
 import os
+import sys
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 
-from .graph.workflow import CentraWorkflowRunner, CHECKPOINTS
-from .audit import AuditLogger
+# Ensure current directory is in sys.path for direct execution
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
+try:
+    from graph.workflow import CentraWorkflowRunner, CHECKPOINTS
+    from graph.nodes.act import IDEMPOTENCY_STORE
+    from audit import AuditLogger
+except (ImportError, ValueError):
+    from .graph.workflow import CentraWorkflowRunner, CHECKPOINTS
+    from .graph.nodes.act import IDEMPOTENCY_STORE
+    from .audit import AuditLogger
 
 app = FastAPI(title="CentraOperator Agent Runtime", version="1.0.0")
 
@@ -29,6 +41,13 @@ class ResumeRequest(BaseModel):
 def health():
     return {"status": "ok", "service": "agent-runtime", "erp_target": ERP_URL}
 
+@app.post("/reset")
+def reset_runtime():
+    CHECKPOINTS.clear()
+    IDEMPOTENCY_STORE.clear()
+    TASK_EXECUTIONS.clear()
+    return {"status": "ok", "message": "Runtime state and idempotency locks cleared"}
+
 @app.post("/runs")
 def start_run(req: RunRequest):
     state = runner.create_initial_state(goal=req.goal, task_id=req.task_id, company_id=req.company_id)
@@ -46,7 +65,8 @@ def start_run(req: RunRequest):
         "status": final_state["status"],
         "summary": final_state.get("facts", {}).get("completion_summary"),
         "interrupt_data": final_state.get("interrupt_data"),
-        "evidence": final_state.get("evidence", [])
+        "evidence": final_state.get("evidence", []),
+        "history": final_state.get("history", [])
     }
 
 @app.post("/resume")
@@ -68,7 +88,8 @@ def resume_run(req: ResumeRequest):
         "task_id": final_state["task_id"],
         "status": final_state["status"],
         "summary": final_state.get("facts", {}).get("completion_summary"),
-        "evidence": final_state.get("evidence", [])
+        "evidence": final_state.get("evidence", []),
+        "history": final_state.get("history", [])
     }
 
 @app.get("/tasks/{task_id}/status")

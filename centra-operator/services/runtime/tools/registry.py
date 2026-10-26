@@ -1,9 +1,15 @@
 import json
 import os
 from typing import Dict, Any, List, Optional
-from .web import WebFormSession
-from .erp_api import ErpApiClient
-from .inbox import InboxTool
+
+try:
+    from tools.web import WebFormSession
+    from tools.erp_api import ErpApiClient
+    from tools.inbox import InboxTool
+except (ImportError, ValueError):
+    from .web import WebFormSession
+    from .erp_api import ErpApiClient
+    from .inbox import InboxTool
 
 TOOL_DEFINITIONS = [
     {

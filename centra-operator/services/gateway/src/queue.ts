@@ -24,7 +24,7 @@ export class TaskQueueService {
     return crypto.createHash('sha256').update(normalized).digest('hex');
   }
 
-  isDuplicate(fingerprint: string, ttlSeconds = 300): boolean {
+  isDuplicate(fingerprint: string, ttlSeconds = 5): boolean {
     const now = Date.now();
     const existing = dedupCache.get(fingerprint);
     if (existing && now < existing) {
@@ -32,6 +32,10 @@ export class TaskQueueService {
     }
     dedupCache.set(fingerprint, now + (ttlSeconds * 1000));
     return false;
+  }
+
+  clearDedup(): void {
+    dedupCache.clear();
   }
 
   async dispatchToRuntime(jobData: TaskJobData): Promise<any> {

@@ -160,7 +160,9 @@ function renderPage(title, body, user = null) {
 // ------------------- Fault Injection Endpoints -------------------
 app.post('/__reset', (req, res) => {
   faults.resetFaults();
-  database.invoices = database.invoices.filter(i => i.id.startsWith('inv_seed_'));
+  database.invoices = database.invoices
+    .filter(i => i.id.startsWith('inv_seed_'))
+    .map(i => ({ ...i, flagged_for_review: false, review_note: undefined }));
   database.sessions.clear();
   res.json({ status: 'ok', invoices_count: database.invoices.length });
 });

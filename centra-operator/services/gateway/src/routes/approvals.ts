@@ -15,6 +15,11 @@ export function createApprovalsRouter(queue: TaskQueueService, relay: ChangeStre
 
     try {
       const result = await queue.resumeInRuntime(taskId, Boolean(approved), note);
+      if (Array.isArray(result.history)) {
+        for (const h of result.history) {
+          relay.broadcastTaskUpdate(taskId, (h.type || 'GRAPH_STEP').toUpperCase(), h);
+        }
+      }
       relay.broadcastTaskUpdate(taskId, result.status, result);
       res.json({
         taskId,

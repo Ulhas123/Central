@@ -1,6 +1,11 @@
 from typing import Dict, Any, List, Optional
-from ..state import RunState
-from ...memory.episodic import EpisodicMemoryStore
+
+try:
+    from graph.state import RunState
+    from memory.episodic import EpisodicMemoryStore
+except (ImportError, ValueError):
+    from ..state import RunState
+    from ...memory.episodic import EpisodicMemoryStore
 
 def evaluate_rules(action: Dict[str, Any], facts: Dict[str, Any], policies: List[Dict[str, Any]]) -> Dict[str, Any]:
     """

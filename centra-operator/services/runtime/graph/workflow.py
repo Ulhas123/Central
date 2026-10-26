@@ -1,21 +1,39 @@
 import time
 import uuid
 from typing import Dict, Any, Optional
-from .state import RunState
-from .nodes.understand import understand_node
-from .nodes.recall import recall_node
-from .nodes.plan import plan_node
-from .nodes.gate import gate_node
-from .nodes.act import act_node
-from .nodes.observe import observe_node
-from .nodes.adapt import adapt_node
-from .nodes.verify import verify_node
-from .nodes.complete import complete_node
 
-from ..tools.registry import ToolRegistry
-from ..memory.sops import SopMemoryStore
-from ..memory.episodic import EpisodicMemoryStore
-from ..audit import AuditLogger
+try:
+    from graph.state import RunState
+    from graph.nodes.understand import understand_node
+    from graph.nodes.recall import recall_node
+    from graph.nodes.plan import plan_node
+    from graph.nodes.gate import gate_node
+    from graph.nodes.act import act_node
+    from graph.nodes.observe import observe_node
+    from graph.nodes.adapt import adapt_node
+    from graph.nodes.verify import verify_node
+    from graph.nodes.complete import complete_node
+
+    from tools.registry import ToolRegistry
+    from memory.sops import SopMemoryStore
+    from memory.episodic import EpisodicMemoryStore
+    from audit import AuditLogger
+except (ImportError, ValueError):
+    from .state import RunState
+    from .nodes.understand import understand_node
+    from .nodes.recall import recall_node
+    from .nodes.plan import plan_node
+    from .nodes.gate import gate_node
+    from .nodes.act import act_node
+    from .nodes.observe import observe_node
+    from .nodes.adapt import adapt_node
+    from .nodes.verify import verify_node
+    from .nodes.complete import complete_node
+
+    from ..tools.registry import ToolRegistry
+    from ..memory.sops import SopMemoryStore
+    from ..memory.episodic import EpisodicMemoryStore
+    from ..audit import AuditLogger
 
 # In-Memory / Durable checkpoint storage for paused tasks awaiting human approval
 CHECKPOINTS: Dict[str, Dict[str, Any]] = {}

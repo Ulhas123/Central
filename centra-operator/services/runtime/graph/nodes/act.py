@@ -1,9 +1,15 @@
 import hashlib
 import time
 from typing import Dict, Any, Optional
-from ..state import RunState
-from ...tools.registry import ToolRegistry
-from ...audit import AuditLogger
+
+try:
+    from graph.state import RunState
+    from tools.registry import ToolRegistry
+    from audit import AuditLogger
+except (ImportError, ValueError):
+    from ..state import RunState
+    from ...tools.registry import ToolRegistry
+    from ...audit import AuditLogger
 
 # Local fallback idempotency store when Redis is offline
 IDEMPOTENCY_STORE = {}

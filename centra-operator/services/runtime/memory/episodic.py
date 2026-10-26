@@ -1,6 +1,10 @@
 import time
 from typing import List, Dict, Any, Optional
-from .sops import compute_cosine_similarity, tokenize_and_embed
+
+try:
+    from memory.sops import compute_cosine_similarity, tokenize_and_embed
+except (ImportError, ValueError):
+    from .sops import compute_cosine_similarity, tokenize_and_embed
 
 class EpisodicMemoryStore:
     """

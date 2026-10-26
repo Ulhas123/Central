@@ -1,6 +1,11 @@
 from typing import Dict, Any, List
-from ..state import RunState
-from ...audit import AuditLogger
+
+try:
+    from graph.state import RunState
+    from audit import AuditLogger
+except (ImportError, ValueError):
+    from ..state import RunState
+    from ...audit import AuditLogger
 
 def complete_node(state: RunState, audit: AuditLogger) -> Dict[str, Any]:
     """
@@ -27,7 +32,12 @@ def complete_node(state: RunState, audit: AuditLogger) -> Dict[str, Any]:
             f"and posted to CentraERP General Ledger. Independently verified via read-only audit API."
         )
     elif intent == "aging_review":
-        flags = facts.get("flags_recorded", 0)
+        flags = facts.get("flags_recorded")
+        if not flags:
+            if evidence and "flagged_invoices_count" in evidence[0]:
+                flags = evidence[0]["flagged_invoices_count"]
+            else:
+                flags = 0
         summary = (
             f"Completed overdue aging review for {facts.get('target_vendor_hint', 'Helios')}. "
             f"Inspected unpaid ledger records and successfully flagged {flags} invoices older than 30 days "

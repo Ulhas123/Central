@@ -1,6 +1,10 @@
 import re
 from typing import Dict, Any, List
-from ..state import RunState
+
+try:
+    from graph.state import RunState
+except (ImportError, ValueError):
+    from ..state import RunState
 
 def understand_node(state: RunState) -> Dict[str, Any]:
     """

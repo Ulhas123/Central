@@ -17,42 +17,46 @@ export function App() {
   const [interruptData, setInterruptData] = useState<any>(null);
   const [evidence, setEvidence] = useState<any[]>([]);
   const [completionSummary, setCompletionSummary] = useState<string | null>(null);
-  const [auditProof, setAuditProof] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const s = io('http://localhost:3000');
+    const s = io('http://localhost:3000', {
+      reconnectionAttempts: 5,
+      timeout: 3000
+    });
     setSocket(s);
 
     s.on('task:update', (data: any) => {
       console.log('Task update received:', data);
-      if (data.eventType) {
+      if (data && data.eventType) {
         setEvents(prev => [...prev, {
-          type: data.eventType,
+          type: String(data.eventType),
           timestamp: new Date().toLocaleTimeString(),
           details: data.payload
         }]);
       }
-      if (data.payload?.status) {
-        setTaskStatus(data.payload.status);
+      if (data?.payload?.status) {
+        setTaskStatus(String(data.payload.status));
       }
-      if (data.payload?.summary) {
-        setCompletionSummary(data.payload.summary);
+      if (data?.payload?.summary) {
+        setCompletionSummary(String(data.payload.summary));
       }
-      if (data.payload?.evidence) {
+      if (Array.isArray(data?.payload?.evidence)) {
         setEvidence(data.payload.evidence);
       }
     });
 
     s.on('hitl:interrupt', (data: any) => {
       console.log('HITL Interrupt received:', data);
-      setCurrentTaskId(data.taskId);
+      if (data?.taskId) setCurrentTaskId(data.taskId);
       setTaskStatus('AWAITING_APPROVAL');
-      setInterruptData(data.interruptData);
+      if (data?.interruptData) {
+        setInterruptData(data.interruptData);
+      }
       setEvents(prev => [...prev, {
         type: 'HITL_INTERRUPT_REQUESTED',
         timestamp: new Date().toLocaleTimeString(),
-        details: data.interruptData
+        details: data?.interruptData
       }]);
     });
 
@@ -68,7 +72,6 @@ export function App() {
     setInterruptData(null);
     setEvidence([]);
     setCompletionSummary(null);
-    setAuditProof(null);
     setTaskStatus('ENQUEUEING');
 
     try {
@@ -78,20 +81,51 @@ export function App() {
         body: JSON.stringify({ goal: activePrompt, company_id: 'COMP-001' })
       });
       const data = await res.json();
-      setCurrentTaskId(data.taskId);
-      setTaskStatus(data.status);
-      if (data.result?.interrupt_data) {
+      
+      if (!res.ok) {
+        const errorMsg = data?.error || data?.details || `Server returned HTTP ${res.status}`;
+        setTaskStatus('ERROR');
+        setEvents(prev => [...prev, {
+          type: 'ERROR',
+          timestamp: new Date().toLocaleTimeString(),
+          details: { message: errorMsg }
+        }]);
+        alert(`Task Dispatch Failed:\n${errorMsg}\n\nPlease verify that the Agent Runtime is running on port 8000.`);
+        return;
+      }
+
+      setCurrentTaskId(data?.taskId || null);
+      setTaskStatus(String(data?.status || 'STARTED'));
+
+      if (data?.result?.interrupt_data) {
         setInterruptData(data.result.interrupt_data);
       }
-      if (data.result?.evidence) {
+      if (Array.isArray(data?.result?.evidence)) {
         setEvidence(data.result.evidence);
       }
-      if (data.result?.summary) {
+      if (data?.result?.summary) {
         setCompletionSummary(data.result.summary);
       }
+      if (Array.isArray(data?.result?.history)) {
+        setEvents(prev => {
+          if (prev.length <= 1) {
+            return data.result.history.map((h: any) => ({
+              type: (h.type || 'GRAPH_STEP').toUpperCase(),
+              timestamp: new Date().toLocaleTimeString(),
+              details: h
+            }));
+          }
+          return prev;
+        });
+      }
     } catch (err: any) {
-      alert('Error launching task: ' + err.message);
-      setTaskStatus('ERROR');
+      setTaskStatus('DISPATCH_ERROR');
+      setEvents(prev => [...prev, {
+        type: 'CONNECTION_ERROR',
+        timestamp: new Date().toLocaleTimeString(),
+        details: { message: err.message }
+      }]);
+      alert(`Cannot connect to Gateway at http://localhost:3000:\n${err.message}\n\nPlease ensure Gateway is running.`);
     } finally {
       setLoading(false);
     }
@@ -112,12 +146,24 @@ export function App() {
       });
       const data = await res.json();
       setInterruptData(null);
-      setTaskStatus(data.status);
-      if (data.result?.evidence) {
+      setTaskStatus(String(data?.status || (approved ? 'APPROVED' : 'REJECTED')));
+      if (Array.isArray(data?.result?.evidence)) {
         setEvidence(data.result.evidence);
       }
-      if (data.result?.summary) {
+      if (data?.result?.summary) {
         setCompletionSummary(data.result.summary);
+      }
+      if (Array.isArray(data?.result?.history)) {
+        setEvents(prev => {
+          if (prev.length <= 1) {
+            return data.result.history.map((h: any) => ({
+              type: (h.type || 'GRAPH_STEP').toUpperCase(),
+              timestamp: new Date().toLocaleTimeString(),
+              details: h
+            }));
+          }
+          return prev;
+        });
       }
     } catch (err: any) {
       alert('Error submitting decision: ' + err.message);
@@ -127,6 +173,7 @@ export function App() {
   };
 
   const nodes = ['Understand', 'Recall', 'Plan', 'Gate', 'Act', 'Observe', 'Adapt', 'Verify', 'Complete'];
+  const safeStatus = (taskStatus || 'IDLE').toString();
 
   return (
     <div className="app-container">
@@ -146,7 +193,7 @@ export function App() {
         <div>
           <div className="panel">
             <h2>Task Launcher</h2>
-            <p style="color: #94a3b8; font-size: 13px; margin-bottom: 12px;">
+            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
               Enter a natural language enterprise objective. The operator will autonomously identify documents, evaluate policies, operate CentraERP, and verify outcomes.
             </p>
             <textarea
@@ -161,22 +208,53 @@ export function App() {
             </button>
 
             <div className="quick-prompts">
-              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>PRESET DEMO SCENARIOS:</span>
-              <button className="btn-prompt" onClick={() => {
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>PRESET DEMO SCENARIOS:</span>
+                <button
+                  onClick={async () => {
+                    try {
+                      await fetch('http://localhost:3000/api/reset', { method: 'POST' });
+                      setEvents([]);
+                      setInterruptData(null);
+                      setEvidence([]);
+                      setCompletionSummary(null);
+                      setCurrentTaskId(null);
+                      setTaskStatus('CLEAN_SLATE');
+                    } catch (e: any) {
+                      console.error(e);
+                    }
+                  }}
+                  style={{
+                    background: '#1e293b',
+                    color: '#94a3b8',
+                    border: '1px solid #475569',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  &#x21bb; Reset Clean State
+                </button>
+              </div>
+              <button className="btn-prompt" onClick={async () => {
+                await fetch('http://localhost:3000/api/reset', { method: 'POST' }).catch(() => {});
                 const p = 'Process the latest Acme invoice and match it to its PO';
                 setPrompt(p);
                 handleRunTask(p);
               }}>
                 1. 🟢 Happy Path: Process Acme invoice ($1,200) &amp; PO match
               </button>
-              <button className="btn-prompt" onClick={() => {
+              <button className="btn-prompt" onClick={async () => {
+                await fetch('http://localhost:3000/api/reset', { method: 'POST' }).catch(() => {});
                 const p = 'Process the Apex Global invoice for security appliance';
                 setPrompt(p);
                 handleRunTask(p);
               }}>
                 2. 🟡 Policy Approval: Apex Global ($14,500) triggers HITL Limit Gate
               </button>
-              <button className="btn-prompt" onClick={() => {
+              <button className="btn-prompt" onClick={async () => {
+                await fetch('http://localhost:3000/api/reset', { method: 'POST' }).catch(() => {});
                 const p = 'List unpaid invoices older than 30 days for vendor Helios and flag them for review';
                 setPrompt(p);
                 handleRunTask(p);
@@ -191,15 +269,19 @@ export function App() {
             <div className="approval-card">
               <h3>⚠️ Human-in-the-Loop Policy Gate Triggered</h3>
               <p style={{ fontSize: '13px', color: '#fef3c7', marginBottom: '8px' }}>
-                <strong>Reason:</strong> {interruptData.reason}
+                <strong>Reason:</strong> {interruptData.reason || 'Manager approval required'}
               </p>
-              <p style={{ fontSize: '12px', color: '#fde68a' }}>
-                <strong>Enforced by SOP:</strong> {interruptData.policy_ids?.join(', ')}
-              </p>
-              {interruptData.similar_past_cases?.length > 0 && (
+              {Array.isArray(interruptData.policy_ids) && (
+                <p style={{ fontSize: '12px', color: '#fde68a' }}>
+                  <strong>Enforced by SOP:</strong> {interruptData.policy_ids.join(', ')}
+                </p>
+              )}
+              {Array.isArray(interruptData.similar_past_cases) && interruptData.similar_past_cases.length > 0 && (
                 <div style={{ marginTop: '10px', fontSize: '12px', background: '#291102', padding: '8px', borderRadius: '4px' }}>
                   <div style={{ color: '#fed7aa', fontWeight: 600 }}>CITED EPISODIC MEMORY:</div>
-                  <div>Prior approval by {interruptData.similar_past_cases[0].approver}: "{interruptData.similar_past_cases[0].reason}"</div>
+                  <div>
+                    Prior approval by {interruptData.similar_past_cases[0].approver || 'Manager'}: "{interruptData.similar_past_cases[0].reason || 'Approved'}"
+                  </div>
                 </div>
               )}
               <div className="approval-buttons">
@@ -224,8 +306,8 @@ export function App() {
             <h2>Autonomous Runtime Loop (LangGraph State)</h2>
             <div className="trace-flow">
               {nodes.map(n => {
-                const isActive = taskStatus.toLowerCase().includes(n.toLowerCase());
-                const isCompleted = taskStatus === 'COMPLETED';
+                const isActive = safeStatus.toLowerCase().includes(n.toLowerCase());
+                const isCompleted = safeStatus === 'COMPLETED';
                 return (
                   <div key={n} className={`trace-node ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
                     {n}
@@ -235,7 +317,7 @@ export function App() {
             </div>
 
             <div style={{ marginBottom: '10px', fontSize: '13px', color: '#94a3b8' }}>
-              Current Status: <strong style={{ color: '#38bdf8' }}>{taskStatus}</strong>
+              Current Status: <strong style={{ color: safeStatus === 'ERROR' ? '#f87171' : '#38bdf8' }}>{safeStatus}</strong>
               {currentTaskId && <span style={{ marginLeft: '12px', color: '#64748b' }}>({currentTaskId})</span>}
             </div>
 
@@ -244,16 +326,19 @@ export function App() {
               {events.length === 0 ? (
                 <div style={{ color: '#475569' }}>Awaiting task dispatch...</div>
               ) : (
-                events.map((ev, i) => (
-                  <div key={i} className={`log-entry ${ev.type.includes('ANOMALY') ? 'anomaly' : ''} ${ev.type.includes('VERIFIED') ? 'success' : ''}`}>
-                    [{ev.timestamp}] <strong>{ev.type}</strong>
-                    {ev.details && typeof ev.details === 'object' && (
-                      <span style={{ color: '#64748b', marginLeft: '6px' }}>
-                        {JSON.stringify(ev.details).substring(0, 80)}...
-                      </span>
-                    )}
-                  </div>
-                ))
+                events.map((ev, i) => {
+                  const evType = String(ev?.type || 'EVENT');
+                  return (
+                    <div key={i} className={`log-entry ${evType.includes('ANOMALY') || evType.includes('ERROR') ? 'anomaly' : ''} ${evType.includes('VERIFIED') || evType.includes('COMPLETED') ? 'success' : ''}`}>
+                      [{ev.timestamp}] <strong>{evType}</strong>
+                      {ev.details && typeof ev.details === 'object' && (
+                        <span style={{ color: '#64748b', marginLeft: '6px' }}>
+                          {JSON.stringify(ev.details).substring(0, 80)}...
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -266,13 +351,13 @@ export function App() {
             ) : (
               evidence.map((ev, idx) => (
                 <div key={idx} className="evidence-box">
-                  <div style={{ fontWeight: 600, color: '#38bdf8' }}>Source: {ev.source}</div>
-                  {ev.verified_record && (
+                  <div style={{ fontWeight: 600, color: '#38bdf8' }}>Source: {ev?.source || 'CentraERP Read-Only API'}</div>
+                  {ev?.verified_record && (
                     <div style={{ marginTop: '4px' }}>
                       Invoice: <strong>{ev.verified_record.invoice_number}</strong> | Amount: <strong>${ev.verified_record.amount}</strong> | Status: <strong style={{ color: '#4ade80' }}>{ev.verified_record.status}</strong>
                     </div>
                   )}
-                  {ev.flagged_invoices && (
+                  {Array.isArray(ev?.flagged_invoices) && (
                     <div style={{ marginTop: '4px' }}>
                       Flagged Records: {ev.flagged_invoices.join(', ')}
                     </div>

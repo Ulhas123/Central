@@ -77,17 +77,36 @@ const database = {
   ]
 };
 
+// Helper: Detect automated agent vs human browser requests
+function isAgentRequest(req) {
+  const ua = req.headers['user-agent'] || '';
+  return ua.includes('CentraOperator') || ua.includes('Python');
+}
+
 // Helper: Session Checker
 function checkAuth(req, res, next) {
   const sessionId = req.cookies['centra_session'];
   const activeFaults = faults.getFaults();
+  const isAgent = isAgentRequest(req);
 
-  if (activeFaults.session_expiry) {
+  // Agent requests: subject to simulated fault matrix (session_expiry)
+  if (isAgent && activeFaults.session_expiry) {
     if (sessionId) {
       database.sessions.delete(sessionId);
       res.clearCookie('centra_session');
     }
     return res.redirect('/login?error=session_expired');
+  }
+
+  // Human browser users: auto-maintain persistent session so presenter never gets kicked out
+  if (!isAgent) {
+    if (!sessionId || !database.sessions.has(sessionId)) {
+      const browserSessionId = 'browser_' + crypto.randomBytes(16).toString('hex');
+      database.sessions.set(browserSessionId, { username: 'erp_ap_clerk', createdAt: Date.now(), isBrowser: true });
+      res.cookie('centra_session', browserSessionId, { httpOnly: true, maxAge: 86400000 * 30 }); // 30 days
+      req.user = { username: 'erp_ap_clerk', createdAt: Date.now(), isBrowser: true };
+      return next();
+    }
   }
 
   if (!sessionId || !database.sessions.has(sessionId)) {
@@ -163,7 +182,13 @@ app.post('/__reset', (req, res) => {
   database.invoices = database.invoices
     .filter(i => i.id.startsWith('inv_seed_'))
     .map(i => ({ ...i, flagged_for_review: false, review_note: undefined }));
-  database.sessions.clear();
+    
+  // Clear automated agent sessions, preserve human presenter browser sessions
+  for (const [sId, sess] of database.sessions.entries()) {
+    if (!sess.isBrowser) {
+      database.sessions.delete(sId);
+    }
+  }
   res.json({ status: 'ok', invoices_count: database.invoices.length });
 });
 
@@ -221,13 +246,13 @@ app.get('/login', (req, res) => {
         <input type="hidden" name="csrf_token" value="${csrfToken}" />
         <div class="form-group">
           <label for="username">Username</label>
-          <input type="text" id="username" name="username" value="" required placeholder="Enter ERP username" />
+          <input type="text" id="username" name="username" value="erp_ap_clerk" required placeholder="Enter ERP username" />
         </div>
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" id="password" name="password" required placeholder="Enter password" />
+          <input type="password" id="password" name="password" value="password123" required placeholder="Enter password" />
         </div>
-        <button id="btn-login-submit" type="submit">Sign In</button>
+        <button id="btn-login-submit" type="submit">Sign In as AP Clerk</button>
       </form>
     </div>
   `;
@@ -237,9 +262,10 @@ app.get('/login', (req, res) => {
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === 'erp_ap_clerk' && password === 'password123') {
-    const sessionId = crypto.randomBytes(24).toString('hex');
-    database.sessions.set(sessionId, { username, createdAt: Date.now() });
-    res.cookie('centra_session', sessionId, { httpOnly: true });
+    const isBrowser = !isAgentRequest(req);
+    const sessionId = (isBrowser ? 'browser_' : 'agent_') + crypto.randomBytes(24).toString('hex');
+    database.sessions.set(sessionId, { username, createdAt: Date.now(), isBrowser });
+    res.cookie('centra_session', sessionId, { httpOnly: true, maxAge: isBrowser ? 86400000 * 30 : undefined });
     // Reset session_expiry fault once re-authenticated
     faults.setFault('session_expiry', false);
     return res.redirect('/dashboard');

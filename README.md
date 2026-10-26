@@ -3,7 +3,6 @@
 **Candidate:** Varun Karankar (IIIT Allahabad)  
 **Role:** Founding Engineer — CentrAlign AI  
 **Domain:** Autonomous Finance & Accounts Payable Operations  
-**Architecture Dossier:** [`CentraOperator_Architecture_Dossier.pdf`](./CentraOperator_Architecture_Dossier.pdf)
 
 ---
 
@@ -261,8 +260,7 @@ class RunState(TypedDict):
 
 ---
 
-## 9. Verification & Submission Dossier
+## 9. Verification & Test Suite
 
-- **Complete Technical Specification:** See [`CentraOperator_Architecture_Dossier.pdf`](./CentraOperator_Architecture_Dossier.pdf) for a 30-page mathematical formalization, LaTeX architecture schemas, and fault recovery proofs.
-- **Automated Test Suite:** Discoverable under `centra-operator/tests/` (10 passing tests).
+- **Automated Test Suite:** Discoverable under `centra-operator/tests/` (10 passing unit tests validating security, idempotency, and verifier primitives).
 - **Automated Evaluation Benchmark:** Executable via `python eval/run_eval.py` across 5 fault injection tasks.

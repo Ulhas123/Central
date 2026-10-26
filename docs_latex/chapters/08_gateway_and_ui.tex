@@ -1,0 +1,78 @@
+\section{Ingress Gateway, Asynchronous Queueing, \& Mission Control UI}
+\label{sec:gateway_and_ui}
+
+\subsection{Ingress Gateway Architecture}
+While the autonomous agent core is authored in Python 3.12 (leveraging native LangGraph capabilities), enterprise ingress demands high-concurrency, non-blocking I/O capable of terminating thousands of persistent WebSocket connections and managing asynchronous task distribution.
+
+CentraOperator deploys a dedicated **Ingress Gateway** written in **TypeScript and Node.js (Express)**:
+
+\begin{lstlisting}[language=c, caption={Ingress API Gateway \& WebSocket Relay (\texttt{services/gateway/src/index.ts})}]
+const app = express();
+const server = http.createServer(app);
+const io = new SocketIOServer(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
+
+const queueService = new TaskQueueService();
+const changeStreamRelay = new ChangeStreamRelay(io);
+
+// Expose high-throughput REST routes
+app.use('/api/tasks', createTasksRouter(queueService, changeStreamRelay));
+app.use('/api/approvals', createApprovalsRouter(queueService, changeStreamRelay));
+\end{lstlisting}
+
+\subsection{Asynchronous Queueing with BullMQ \& Redis}
+To prevent client HTTP timeouts during long-running agent workflows (which may take several seconds or require human approval pauses spanning hours), task submission is strictly decoupled from execution:
+
+\begin{enumerate}
+  \item \textbf{Ingress Producer:} When a user or system initiates a task via \texttt{POST /api/tasks}, the gateway validates the schema and enqueues the payload into a Redis-backed **BullMQ queue**:
+  \begin{equation}
+    \text{Client Request} \xrightarrow{} \text{Gateway API} \xrightarrow{} \text{BullMQ Queue (Redis)} \xrightarrow{} \text{HTTP 202 Accepted}
+  \end{equation}
+  \item \textbf{Asynchronous Worker:} Dedicated worker processes dequeue jobs, dispatch execution requests to the Python runtime's \texttt{POST /runs} endpoint, and manage retry backoffs.
+  \item \textbf{State Persistence:} Intermediate checkpoints, task statuses, and event logs are persisted in MongoDB.
+\end{enumerate}
+
+\subsection{Reactive Real-Time Telemetry via Change Streams}
+Traditional polling architectures flood databases with redundant queries and introduce telemetry latency. CentraOperator uses a **reactive push model**:
+
+\begin{lstlisting}[language=c, caption={MongoDB Change Stream Listener Relay (\texttt{services/gateway/src/changeStream.ts})}]
+export class ChangeStreamRelay {
+  constructor(private io: SocketIOServer) {}
+
+  public relayTaskUpdate(taskId: string, eventType: string, payload: any) {
+    // Broadcast real-time execution steps directly to connected browser clients
+    this.io.emit('task:update', { taskId, eventType, payload, timestamp: new Date() });
+    
+    // Broadcast Human-in-the-Loop interrupts
+    if (eventType === 'HITL_INTERRUPT') {
+      this.io.emit('hitl:interrupt', { taskId, interruptData: payload });
+    }
+  }
+}
+\end{lstlisting}
+
+When MongoDB records an updated state document from the Python runtime, the gateway's Change Stream listener captures the delta and emits an instantaneous WebSocket event to all connected dashboard instances.
+
+\subsection{Mission Control React Dashboard}
+The user interface (\texttt{services/dashboard}) is built with **React 18**, **Vite**, and **Socket.IO-Client**:
+
+\begin{figure}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{p{4.2cm} X}
+    \toprule
+    \textbf{UI Component} & \textbf{Functionality and Human Operator Capabilities} \\
+    \midrule
+    \textbf{Task Launcher Panel} & Input interface allowing operators to issue natural-language directives (e.g., custom prompts or benchmark presets). \\
+    \addlinespace
+    \textbf{Live Telemetry Stream} & Real-time, color-coded execution trace displaying every node transition (\texttt{UNDERSTAND} $\to$ \texttt{RECALL} $\to$ \texttt{PLAN} $\to$ \texttt{GATE} $\to$ \texttt{ACT} $\to$ \texttt{OBSERVE}). \\
+    \addlinespace
+    \textbf{Approval Card (HITL)} & Interactive modal rendered immediately upon policy interrupt. Displays the target operation, exact rule violation, and historical precedent. Features \textbf{Approve} and \textbf{Reject} buttons with manager notes. \\
+    \addlinespace
+    \textbf{Evidence Inspector} & Renders independent proof objects returned by the read-only ERP API (General Ledger record ID, verified amounts, timestamps). \\
+    \addlinespace
+    \textbf{Cryptographic Audit Proof} & Displays the verified SHA-256 final hash, event block count, and a tamper-integrity seal. \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Functional Architecture of the CentraOperator React Mission Control UI.}
+  \label{tab:ui_components}
+\end{figure}

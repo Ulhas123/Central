@@ -1,0 +1,17 @@
+INVOICE
+Vendor: Apex Global Inc.
+Vendor ID: VND-APEX-09
+Invoice Number: INV-9901
+Invoice Date: 2026-10-22
+Due Date: 2026-11-22
+Purchase Order Number: APX-104
+
+Line Items:
+1. Enterprise Security Appliance & Dedicated Gateway Node = $14,500.00
+
+Subtotal: $14,500.00
+Tax: $0.00
+Total Amount: $14,500.00
+Payment Terms: Net 30
+Remit to: accounts@apex-global.internal
+Note: Requires executive approval per corporate capital expenditure threshold.

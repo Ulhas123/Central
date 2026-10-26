@@ -1,0 +1,16 @@
+From: collections@helios-systems.internal
+To: ap@company.internal
+Date: 2026-10-25
+Subject: Urgent: Statement of Overdue Accounts - Helios Systems
+
+Dear Finance Team,
+
+Please review our pending account ledger. According to our records, several invoices submitted over 30 days ago remain unpaid:
+- Invoice INV-HEL-101: $3,400.00 (Due Date: 2026-08-15) - Status: UNPAID
+- Invoice INV-HEL-102: $1,850.00 (Due Date: 2026-09-01) - Status: UNPAID
+- Invoice INV-HEL-108: $800.00 (Due Date: 2026-10-24) - Status: PENDING (Within 30 days)
+
+Please review the unpaid invoices older than 30 days and flag them for expedited review.
+
+Regards,
+Helios Accounts Receivable

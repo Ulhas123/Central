@@ -1,0 +1,64 @@
+\documentclass[11pt,a4paper]{article}
+
+% Load custom unified publication style
+\usepackage{styles/centra_style}
+
+\title{
+  \vspace{-1.5cm}
+  {\Huge\textbf{\color{centrablue}CentraOperator: Autonomous Enterprise Company Operator}}\\[8pt]
+  {\Large\textsf{\color{centrateal}Architecture, Implementation, Verification, \& Systems Engineering Dossier}}\\[14pt]
+  {\normalsize\textsf{\color{centragray}Technical Prototype \& Systems Specification for the Founding Engineer Role at CentrAlign AI}}
+}
+
+\author{
+  \textbf{Varun Karankar}\\
+  \textsf{Indian Institute of Information Technology (IIIT) Allahabad}\\
+  \texttt{Candidate: Founding Engineer / Autonomous AI Systems}
+}
+
+\date{October 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+Enterprise operations require autonomous artificial intelligence systems that move beyond passive text generation to execute, verify, and settle real-world knowledge work inside core corporate systems. This engineering dossier provides an exhaustive architectural and implementation analysis of \textbf{CentraOperator}, an autonomous company operator engineered specifically for the \textbf{CentrAlign AI} Founding Engineer technical evaluation.
+
+CentraOperator transforms concise, unscripted natural language operational directives (demonstrated on Accounts Payable invoice processing, purchase order matching, and ledger aging reviews) into completed, cryptographically verified enterprise transactions. The platform achieves this through an \textbf{8-stage cyclical execution state machine} powered by LangGraph, protocol-level web automation with least-privilege credential injection, deterministic policy gating enforced in native code, dynamic recovery across a 7-fault environmental matrix, and independent read-path verification via isolated database APIs. Furthermore, all state mutations and verification outcomes are cryptographically linked in a tamper-evident SHA-256 audit chain. The complete architecture is strictly anchored in candidate resume-derived technologies (Python, FastAPI, LangGraph, Qdrant, TypeScript, Express, MongoDB Change Streams, Redis, BullMQ, and React 18). Empirical evaluation across an automated 5-task benchmark suite demonstrates a $100.0\%$ verified task success rate, $100.0\%$ silent failure detection rate, zero duplicate writes, and sub-100 millisecond execution latency.
+\end{abstract}
+
+\vspace{0.4cm}
+{
+  \hypersetup{linkcolor=centrablue}
+  \tableofcontents
+}
+\vspace{0.6cm}
+\hrule
+\vspace{0.8cm}
+
+% Modular Chapter Inclusions
+\input{chapters/01_executive_summary.tex}
+\newpage
+\input{chapters/02_tech_stack_provenance.tex}
+\newpage
+\input{chapters/03_runtime_state_graph.tex}
+\newpage
+\input{chapters/04_browserless_automation.tex}
+\newpage
+\input{chapters/05_deterministic_gating.tex}
+\newpage
+\input{chapters/06_fault_recovery_verifier.tex}
+\newpage
+\input{chapters/07_audit_cryptography.tex}
+\newpage
+\input{chapters/08_gateway_and_ui.tex}
+\newpage
+\input{chapters/09_empirical_benchmarks.tex}
+\newpage
+\input{chapters/10_deployment_and_runbook.tex}
+\newpage
+\input{chapters/11_founding_engineer_defense.tex}
+
+\end{document}

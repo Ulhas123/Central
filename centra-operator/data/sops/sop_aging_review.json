@@ -1,0 +1,19 @@
+{
+  "id": "sop-aging-review",
+  "title": "Vendor Account Aging Review and Discrepancy Escalation",
+  "text": "When requested to review vendor aging or overdue accounts, the operator must: 1) Query the unpaid invoices list for the designated vendor in the ERP system. 2) Filter and identify all invoices where the due date is older than 30 days from today's system date. 3) Flag the identified records for supervisory review with an audit note containing the age and outstanding amount. 4) Compile and return verified evidence of the flagged records.",
+  "rules": [
+    {
+      "applies_to": "flag_aging_review",
+      "field": "age_days",
+      "op": "gt",
+      "value": 30,
+      "action": "execute_flag",
+      "reason": "Overdue balance older than 30 days requires priority escalation"
+    }
+  ],
+  "required_checks": [
+    "vendor_invoices_inspected",
+    "overdue_flag_recorded"
+  ]
+}

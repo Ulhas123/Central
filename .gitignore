@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+*/node_modules/
+services/*/node_modules/
+
+# Python Cache & Bytecode
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+.venv/
+env/
+
+# Build outputs
+dist/
+*/dist/
+build/
+*/build/
+
+# Environment variables & secrets
+.env
+*.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# LaTeX build debris
+*.aux
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# OS Debris
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Internal notes & raw recruitment specifications
+JD CentrAlign AI_ Hiring.docx
+jd_full.txt
+revised.md

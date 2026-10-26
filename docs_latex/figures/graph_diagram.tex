@@ -1,0 +1,60 @@
+\begin{tikzpicture}[
+  scale=0.92, transform shape,
+  node distance=1.1cm and 1.5cm,
+  state/.style={rectangle, rounded corners=2.5mm, draw=centrablue, fill=centrabg, line width=1pt, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\small\sffamily\bfseries},
+  startstop/.style={ellipse, draw=centradark, fill=centradark!10, line width=1pt, minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small\sffamily\bfseries},
+  decision/.style={diamond, draw=centragold, fill=centragold!10, line width=1pt, inner sep=1.5pt, align=center, font=\scriptsize\sffamily\bfseries, aspect=1.6},
+  hitl/.style={rectangle, rounded corners=2.5mm, draw=centrared, fill=centrared!10, line width=1.2pt, minimum width=2.6cm, minimum height=0.9cm, align=center, font=\small\sffamily\bfseries},
+  edge/.style={->, >=Stealth, line width=1pt, draw=centrablue},
+  rededge/.style={->, >=Stealth, line width=1.2pt, draw=centrared},
+  greenedge/.style={->, >=Stealth, line width=1.2pt, draw=centragreen},
+  dashededge/.style={->, >=Stealth, line width=1pt, draw=centrateal, dashed}
+]
+
+% Top Row: Ingestion to Gating
+\node[startstop] (goal) {Goal Ingest};
+\node[state, right=1.0cm of goal] (understand) {Understand\\Node};
+\node[state, right=1.0cm of understand] (recall) {Recall\\Node};
+\node[state, right=1.0cm of recall] (plan) {Plan\\Node};
+\node[state, below=1.4cm of plan] (gate) {Gate\\Node};
+
+% HITL Interrupt Branch
+\node[hitl, right=1.4cm of gate] (interrupt) {HITL Interrupt\\Pause \& Card};
+\node[decision, below=1.1cm of interrupt] (human) {Human\\Approval?};
+
+% Execution and Observation (Middle/Bottom Row)
+\node[state, left=1.3cm of gate] (act) {Act\\Node};
+\node[state, left=1.3cm of act] (observe) {Observe\\Node};
+\node[state, below=1.6cm of act] (adapt) {Adapt\\Node};
+
+% Verification and Completion
+\node[state, below=1.6cm of observe] (verify) {Verify\\Node (Read-Path)};
+\node[startstop, draw=centragreen, fill=centragreen!15, left=1.2cm of verify] (complete) {Complete\\Verified Pass};
+
+% Normal Forward Flow
+\draw[edge] (goal) -- (understand);
+\draw[edge] (understand) -- (recall);
+\draw[edge] (recall) -- (plan);
+\draw[edge] (plan) -- (gate) node[midway, right, font=\tiny] {Action Selected};
+\draw[greenedge] (gate) -- (act) node[midway, above, font=\tiny\bfseries] {Policy Cleared};
+\draw[edge] (act) -- (observe) node[midway, above, font=\tiny] {DOM Model};
+
+% Decision at Observe
+\draw[edge] (observe) |- (plan) node[pos=0.25, left, font=\tiny] {Step Success};
+\draw[rededge] (observe) -- (adapt) node[midway, left, font=\tiny\bfseries\color{centrared}] {Fault / Anomaly};
+
+% Gate HITL Pauses
+\draw[rededge] (gate) -- (interrupt) node[midway, above, font=\tiny\bfseries\color{centrared}] {Threshold Met};
+\draw[rededge] (interrupt) -- (human);
+\draw[greenedge] (human) -| (act) node[pos=0.2, above, font=\tiny\bfseries\color{centragreen}] {Approved (Resume)};
+\draw[rededge] (human.south) -- ++(0,-0.4) -| (adapt) node[pos=0.15, below, font=\tiny\bfseries\color{centrared}] {Rejected};
+
+% Verification Flow
+\draw[edge] (plan) -- ++(0,-3.8) -| (verify) node[pos=0.1, above, font=\tiny] {All Plan Steps Executed};
+\draw[greenedge] (verify) -- (complete) node[midway, above, font=\tiny\bfseries\color{centragreen}] {API Matches State};
+\draw[rededge] (verify) -- (adapt) node[midway, above, font=\tiny\bfseries\color{centrared}] {Read Failure / Lying UI};
+
+% Dynamic Re-planning Loop
+\draw[dashededge] (adapt) -- (plan) node[midway, left, font=\tiny\bfseries\color{centrateal}] {Mutated Strategy / Backoff};
+
+\end{tikzpicture}

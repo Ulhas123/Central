@@ -1,0 +1,123 @@
+\section{Environmental Fault Recovery \& The Independent Verifier}
+\label{sec:fault_recovery}
+
+\subsection{The 7-Fault Enterprise Environmental Matrix}
+Real-world enterprise applications are brittle, inconsistent, and prone to environmental degradation. An autonomous operator that operates only under pristine ``happy-path'' conditions is non-viable for production.
+
+To rigorously stress-test CentraOperator, the target enterprise platform (\textbf{CentraERP}) incorporates a toggleable **Environmental Fault Injection Matrix** comprising seven enterprise failure modes:
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{l p{4.5cm} X}
+    \toprule
+    \textbf{Fault Identifier} & \textbf{Simulated Environmental Condition} & \textbf{CentraOperator Recovery Mechanism} \\
+    \midrule
+    \texttt{session\_expiry} & Server forcibly invalidates session cookie, redirecting to \texttt{/login}. & \texttt{adapt\_node} detects auth redirect in DOM, invokes re-login procedure, restores session, and replans original step. \\
+    \addlinespace
+    \texttt{interstitial\_banner} & Unannounced corporate compliance banner blocks form access. & \texttt{observe\_node} identifies modal alert; \texttt{adapt\_node} injects dismissal action before resuming form submission. \\
+    \addlinespace
+    \texttt{renamed\_field} & Input attribute renamed from \texttt{invoice\_id} to \texttt{inv\_number}. & Dynamic form parser matches field via semantic label association rather than hardcoded HTML ID. \\
+    \addlinespace
+    \texttt{date\_format\_error} & Form rejects ISO \texttt{YYYY-MM-DD}, demanding \texttt{MM/DD/YYYY}. & \texttt{observe\_node} captures field validation error; \texttt{adapt\_node} transforms date string and retries. \\
+    \addlinespace
+    \texttt{slow\_response} & Target server introduces artificial 5,000ms latency spikes. & Exponential backoff with jitter and non-blocking asynchronous execution timers. \\
+    \addlinespace
+    \texttt{lying\_success} & UI renders green ``Invoice Submitted'' banner, but DB write silently dropped. & \textbf{Caught by Independent Read-Path Verifier}: queries raw database via API, discovers 0 records, rejects false positive. \\
+    \addlinespace
+    \texttt{duplicate\_trap} & Simultaneous or repeated POST attempts to create duplicate invoice. & Blocked by tool-level Redis SHA-256 idempotency locks and database unique composite indices. \\
+    \bottomrule
+  \end{tabularx}
+  \caption{The 7-Fault Environmental Matrix Implemented in CentraERP and Handled by CentraOperator.}
+  \label{tab:fault_matrix}
+\end{table}
+
+\subsection{The Adapt Node and Infinite-Loop Prevention}
+When \texttt{observe\_node} detects an error alert or abnormal redirect, the state graph transitions immediately to \texttt{adapt\_node}:
+
+\begin{lstlisting}[language=Python, caption={Fault Recovery State Transition (\texttt{services/runtime/graph/nodes/adapt.py})}]
+def adapt_node(state: RunState) -> Dict[str, Any]:
+    last_obs = state.get("last_observation", {})
+    anomalies = last_obs.get("anomalies", [])
+    step_key = state.get("pending_action", {}).get("operation", "unknown_step")
+    attempts = state.get("attempts", {})
+    current_attempt = attempts.get(step_key, 0) + 1
+    attempts[step_key] = current_attempt
+
+    # Enforce strict retry and step budget guardrails
+    max_retries = state.get("budget", {}).get("max_retries", 3)
+    if current_attempt > max_retries:
+        return {
+            "status": "FAILED",
+            "history": [{"type": "error", "message": f"Retry budget exceeded ({max_retries}) for step {step_key}"}]
+        }
+
+    # Recover from session expiry
+    if "session_expired" in anomalies:
+        return {
+            "status": "ADAPTING",
+            "pending_action": {
+                "operation": "login",
+                "tool": "web_submit",
+                "form_id": "login_form",
+                "fields": {"username": "ap_clerk", "credential_ref": "erp_ap_clerk"}
+            }
+        }
+    return {"status": "PLANNING"}
+\end{lstlisting}
+
+\begin{guardrailbox}[Budget Guardrail: Infinite-Loop Defense]
+To ensure the agent cannot be trapped in infinite recovery loops, every run operates under strict, immutable budgets:
+\begin{itemize}
+  \item \textbf{Per-Operation Retry Limit:} $\le 3$ retries per anomaly type.
+  \item \textbf{Total Task Step Budget:} $\le 25$ cumulative transitions.
+\end{itemize}
+If either threshold is breached, the agent immediately terminates execution with a clear diagnostic audit receipt, preventing runaway API costs or server resource exhaustion.
+\end{guardrailbox}
+
+\subsection{Independent Read-Path Verification}
+\label{sec:independent_verifier}
+One of the most consequential flaws in naive autonomous systems is trusting the target application's user interface. If a web application renders a confirmation banner (\textit{``Transaction successful!''}) but experiences a silent database write failure, a naive agent marks the task as complete, reporting false data to human managers.
+
+CentraOperator introduces **Independent Read-Path Verification**:
+
+\begin{insightbox}[Verification Invariant: Write Path $\ne$ Read Path]
+The agent performs state mutations through server-rendered web forms, but **it never trusts form responses to verify completion**. Instead, verification is routed through an isolated, read-only JSON API using an independent read-only audit token (\texttt{ro\_audit\_token\_9941}).
+\end{insightbox}
+
+\begin{lstlisting}[language=Python, caption={Independent Read-Path Verifier (\texttt{services/runtime/graph/nodes/verify.py})}]
+def verify_node(state: RunState, erp_api: ErpApiClient, audit: AuditLogger) -> Dict[str, Any]:
+    facts = state.get("facts", {})
+    inv_number = facts.get("invoice_number")
+    expected_amount = facts.get("amount")
+
+    # Independent Read: Query ERP API directly with read-only token
+    res = erp_api.api_get("/api/invoices", query={"invoice_number": inv_number})
+    invoices = res.get("invoices", [])
+    
+    all_passed = True
+    failure_reasons = []
+
+    # Check 1: Record exists in true underlying database
+    if not invoices:
+        all_passed = False
+        failure_reasons.append(f"Invoice {inv_number} not found in General Ledger.")
+    else:
+        record = invoices[0]
+        # Check 2: Transaction status is committed and POSTED
+        if record.get("status") != "POSTED":
+            all_passed = False
+            failure_reasons.append(f"Status mismatch: expected POSTED, found {record.get('status')}")
+
+        # Check 3: Quantitative amount exactly matches source invoice
+        if abs(float(record.get("amount", 0.0)) - float(expected_amount)) > 0.01:
+            all_passed = False
+            failure_reasons.append(f"Amount mismatch: expected ${expected_amount}, found ${record.get('amount')}")
+
+    return {
+        "status": "VERIFIED" if all_passed else "VERIFICATION_FAILED",
+        "verification": {"verified": all_passed, "failure_reasons": failure_reasons}
+    }
+\end{lstlisting}
+
+This architecture successfully caught $100\%$ of simulated silent failures during empirical evaluation (Section~\ref{sec:benchmarks}), transforming a potentially catastrophic silent data loss into an autonomously caught, audited failure.

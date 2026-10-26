@@ -1,0 +1,19 @@
+{
+  "id": "sop-po-matching",
+  "title": "Three-Way Purchase Order Verification Procedure",
+  "text": "Before recording any vendor invoice in CentraERP, the operator must inspect the PO ledger to verify that: 1) The referenced Purchase Order exists and is in OPEN status. 2) The vendor name and vendor ID on the invoice match the PO record. 3) The invoiced amount does not exceed the remaining committed balance on the PO. If no PO is referenced or the PO is CLOSED, the invoice must be held for inquiry.",
+  "rules": [
+    {
+      "applies_to": "invoice_post",
+      "field": "po_status",
+      "op": "ne",
+      "value": "OPEN",
+      "action": "require_approval",
+      "reason": "Referenced Purchase Order is not in OPEN status"
+    }
+  ],
+  "required_checks": [
+    "po_verified",
+    "vendor_matched"
+  ]
+}

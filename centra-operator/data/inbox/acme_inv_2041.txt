@@ -1,0 +1,16 @@
+INVOICE
+Vendor: Acme Corporation
+Vendor ID: VND-ACME-01
+Invoice Number: INV-2041
+Invoice Date: 2026-10-20
+Due Date: 2026-11-20
+Purchase Order Number: ACM-892
+
+Line Items:
+1. Cloud Infrastructure Consulting - 10 hrs @ $120.00/hr = $1,200.00
+
+Subtotal: $1,200.00
+Tax: $0.00
+Total Amount: $1,200.00
+Payment Terms: Net 30
+Remit to: billing@acme-corp.internal

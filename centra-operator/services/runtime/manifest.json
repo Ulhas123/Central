@@ -1,0 +1,58 @@
+{
+  "system_name": "CentraERP",
+  "erp_base": "http://localhost:4000",
+  "credentials": {
+    "erp_ap_clerk": {
+      "login_url": "/login",
+      "username_field": "username",
+      "password_field": "password",
+      "username_val": "erp_ap_clerk",
+      "password_val": "password123"
+    }
+  },
+  "rules": [
+    {
+      "match": "GET *",
+      "risk": "read",
+      "description": "Read-only web page view or API query"
+    },
+    {
+      "match": "POST /login",
+      "risk": "auth",
+      "description": "Session authentication"
+    },
+    {
+      "match": "POST /dismiss-banner",
+      "risk": "nav",
+      "description": "Dismiss interstitial banner"
+    },
+    {
+      "match": "POST /invoices",
+      "risk": "write",
+      "operation": "invoice_post",
+      "idempotency_fields": ["vendor", "invoice_number"],
+      "description": "Posting vendor invoice to the General Ledger"
+    },
+    {
+      "match": "POST /api/invoices/*/flag",
+      "risk": "write",
+      "operation": "flag_aging_review",
+      "idempotency_fields": ["invoice_id"],
+      "description": "Flagging an invoice for overdue review"
+    },
+    {
+      "match": "POST /payments",
+      "risk": "irreversible",
+      "operation": "payment_release",
+      "idempotency_fields": ["payment_ref", "amount"],
+      "description": "Releasing payment funds to vendor"
+    }
+  ],
+  "entry_pages": {
+    "login": "/login",
+    "dashboard": "/dashboard",
+    "invoices_ledger": "/invoices",
+    "invoices_new": "/invoices/new",
+    "po_ledger": "/po"
+  }
+}

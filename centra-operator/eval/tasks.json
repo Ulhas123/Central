@@ -1,0 +1,46 @@
+[
+  {
+    "id": "task_1_happy_path",
+    "name": "Standard Accounts Payable Processing (Acme Corp)",
+    "prompt": "Process the latest Acme invoice and match it to its PO",
+    "fault": null,
+    "expected_status": "COMPLETED",
+    "requires_hitl": false,
+    "expected_amount": 1200.00
+  },
+  {
+    "id": "task_2_hitl_limit",
+    "name": "Over-Limit Policy Guardrail & Resumption (Apex Global)",
+    "prompt": "Process the Apex Global invoice for security appliance",
+    "fault": null,
+    "expected_status": "AWAITING_APPROVAL",
+    "requires_hitl": true,
+    "expected_amount": 14500.00
+  },
+  {
+    "id": "task_3_fault_recovery",
+    "name": "Self-Healing Recovery under Session Expiry & Interstitial Notice",
+    "prompt": "Process the latest Acme invoice and match it to its PO",
+    "fault": "session_expiry",
+    "expected_status": "COMPLETED",
+    "requires_hitl": false,
+    "expected_amount": 1200.00
+  },
+  {
+    "id": "task_4_lying_ui_caught",
+    "name": "Silent Failure Detection via Independent Read-Path Verification",
+    "prompt": "Process the latest Acme invoice and match it to its PO",
+    "fault": "lying_success",
+    "expected_status": "VERIFICATION_FAILED",
+    "requires_hitl": false,
+    "expected_amount": 1200.00
+  },
+  {
+    "id": "task_5_generalization",
+    "name": "Generalization Task: Helios Systems Aging Review (Zero Code Changes)",
+    "prompt": "List unpaid invoices older than 30 days for vendor Helios and flag them for review",
+    "fault": null,
+    "expected_status": "COMPLETED",
+    "requires_hitl": false
+  }
+]

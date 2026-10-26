@@ -1,0 +1,151 @@
+\ProvidesPackage{styles/centra_style}[2026/10/26 CentraOperator Publication Style]
+
+% Core typography and layout
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage[margin=0.95in,top=1in,bottom=1in,headheight=15pt]{geometry}
+\RequirePackage{microtype}
+\RequirePackage{amsmath,amssymb}
+
+% Colors
+\RequirePackage{xcolor}
+\definecolor{centrablue}{HTML}{0E2B5C}
+\definecolor{centrateal}{HTML}{00838F}
+\definecolor{centradark}{HTML}{1A2A3A}
+\definecolor{centragray}{HTML}{4A5568}
+\definecolor{centrabg}{HTML}{F8FAFC}
+\definecolor{centraborder}{HTML}{CBD5E1}
+\definecolor{centrared}{HTML}{B91C1C}
+\definecolor{centragreen}{HTML}{15803D}
+\definecolor{centragold}{HTML}{B45309}
+\definecolor{codebg}{HTML}{F1F5F9}
+\definecolor{codecomment}{HTML}{64748B}
+\definecolor{codekeyword}{HTML}{0F172A}
+\definecolor{codestring}{HTML}{0284C7}
+
+% Headers & Footers
+\RequirePackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{centragray}{\small\textsf{\textbf{CentraOperator} | Systems Architecture Dossier}}}
+\fancyhead[R]{\textcolor{centragray}{\small\textsf{\leftmark}}}
+\fancyfoot[L]{\textcolor{centragray}{\scriptsize\textsf{CentrAlign AI Founding Engineer Evaluation}}}
+\fancyfoot[R]{\textcolor{centragray}{\small\textsf{\thepage}}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyfoot[R]{\textcolor{centragray}{\small\textsf{\thepage}}}
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+
+% Section Titles Styling
+\RequirePackage{titlesec}
+\titleformat{\section}
+  {\color{centrablue}\normalfont\Large\bfseries\sffamily}
+  {\thesection}{1em}{}[\titlerule]
+\titleformat{\subsection}
+  {\color{centrateal}\normalfont\large\bfseries\sffamily}
+  {\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\color{centradark}\normalfont\normalsize\bfseries\sffamily}
+  {\thesubsubsection}{1em}{}
+
+% Lists & Tables
+\RequirePackage{enumitem}
+\setlist{itemsep=3pt,topsep=4pt}
+\RequirePackage{booktabs}
+\RequirePackage{tabularx}
+\RequirePackage{array}
+\RequirePackage{caption}
+\captionsetup{font={small,sf},labelfont={bf,color=centrablue}}
+
+% TikZ Graphics
+\RequirePackage{tikz}
+\usetikzlibrary{shapes,arrows.meta,positioning,calc,fit,backgrounds,shadows}
+
+% Callout Boxes
+\RequirePackage[many]{tcolorbox}
+\newtcolorbox{insightbox}[1][]{
+  colback=centrabg,
+  colframe=centrateal,
+  coltitle=white,
+  fonttitle=\bfseries\sffamily,
+  title={#1},
+  arc=3mm,
+  boxrule=1pt,
+  left=10pt,right=10pt,top=8pt,bottom=8pt,
+  enhanced,
+  shadow={1.5mm}{-1.5mm}{0mm}{black!10}
+}
+
+\newtcolorbox{guardrailbox}[1][]{
+  colback=red!5!white,
+  colframe=centrared,
+  coltitle=white,
+  fonttitle=\bfseries\sffamily,
+  title={#1},
+  arc=3mm,
+  boxrule=1.2pt,
+  left=10pt,right=10pt,top=8pt,bottom=8pt,
+  enhanced,
+  shadow={1.5mm}{-1.5mm}{0mm}{black!10}
+}
+
+\newtcolorbox{auditbox}[1][]{
+  colback=blue!3!white,
+  colframe=centrablue,
+  coltitle=white,
+  fonttitle=\bfseries\sffamily,
+  title={#1},
+  arc=3mm,
+  boxrule=1.2pt,
+  left=10pt,right=10pt,top=8pt,bottom=8pt,
+  enhanced,
+  shadow={1.5mm}{-1.5mm}{0mm}{black!10}
+}
+
+\newtcolorbox{qaquerybox}[1][]{
+  colback=gray!5!white,
+  colframe=centradark,
+  coltitle=white,
+  fonttitle=\bfseries\sffamily,
+  title={#1},
+  arc=2mm,
+  boxrule=1pt,
+  left=10pt,right=10pt,top=8pt,bottom=8pt
+}
+
+% Code Listings
+\RequirePackage{listings}
+\lstdefinestyle{centracode}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{codecomment}\itshape,
+  keywordstyle=\color{centrablue}\bfseries,
+  stringstyle=\color{codestring},
+  numberstyle=\tiny\color{centragray},
+  numbers=left,
+  numbersep=8pt,
+  showstringspaces=false,
+  tabsize=2,
+  frame=single,
+  rulecolor=\color{centraborder},
+  xleftmargin=15pt,
+  framexleftmargin=15pt
+}
+\lstset{style=centracode}
+
+% Hyperref (Loaded Last)
+\RequirePackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=centrablue,
+  citecolor=centrateal,
+  urlcolor=centrateal,
+  pdfborder={0 0 0}
+}

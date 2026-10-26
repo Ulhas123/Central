@@ -1,0 +1,81 @@
+\section{Cryptographic Auditing \& Tamper-Evident Hash Chaining}
+\label{sec:audit_cryptography}
+
+\subsection{Enterprise Compliance \& Non-Repudiation}
+In regulated enterprise environments (governed by Sarbanes-Oxley [SOX], SOC 2 Type II, and ISO 27001), granting autonomous AI agents the authority to mutate financial ledgers introduces severe compliance and liability requirements. Standard database transaction logs are insufficient: an insider or malicious actor with database write permissions could alter historical log entries after an incident to obscure unauthorized actions.
+
+CentraOperator provides **mathematically verifiable, tamper-evident audit chaining** using SHA-256 cryptographic linkage:
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/audit_chain_diagram.tex}
+  \caption{Cryptographic Linkage in CentraOperator's Tamper-Evident Audit Chain. Every discrete state transition, action payload, gate decision, and verification check forms a sealed block cryptographically anchored to its predecessor.}
+  \label{fig:audit_chain}
+\end{figure}
+
+\subsection{Formal Cryptographic Construction}
+Let an audit chain $\mathcal{C}$ be an ordered sequence of entries $\langle e_0, e_1, \dots, e_n \rangle$. Each entry $e_i$ contains a payload body $B_i$, a sequence number $i$, a timestamp $t_i$, a predecessor hash $h_{i-1}$, and an entry hash $h_i$.
+
+\begin{auditbox}[Formal Hash Chain Specification]
+\begin{align}
+  h_{\text{genesis}} &= 0^{64} = \underbrace{\texttt{0000000000000000000000000000000000000000000000000000000000000000}}_{64\text{ hexadecimal zeros}} \\
+  h_0 &= \text{SHA-256}\Big( h_{\text{genesis}} \mathbin{\Vert} \text{canonical}(B_0) \Big) \\
+  h_i &= \text{SHA-256}\Big( h_{i-1} \mathbin{\Vert} \text{canonical}(B_i) \Big), \quad \forall i \ge 1
+\end{align}
+where $\mathbin{\Vert}$ denotes byte concatenation, and $\text{canonical}(B)$ represents deterministic canonical JSON serialization.
+\end{auditbox}
+
+\subsubsection{Deterministic Canonical JSON Serialization}
+Standard JSON serialization libraries produce non-deterministic strings due to arbitrary dictionary key orderings and varying whitespace formatting. CentraOperator enforces strict canonical serialization:
+\begin{lstlisting}[language=Python, caption={Deterministic Canonical Serialization (\texttt{services/runtime/audit.py})}]
+def canonical_json(obj: Any) -> str:
+    """Produces deterministic canonical JSON serialization for cryptographic hashing."""
+    return json.dumps(obj, sort_keys=True, separators=(',', ':'))
+\end{lstlisting}
+By enforcing lexicographical key sorting and eliminating extraneous whitespace separators, the hashed byte representation is strictly invariant across runtime environments, architectures, and language runtimes.
+
+\subsection{Tamper Detection Mathematical Invariant}
+Suppose an adversary modifies any field within an entry $e_k$ where $0 \le k < n$, replacing $B_k$ with $B'_k \ne B_k$.
+\begin{enumerate}
+  \item Due to the collision resistance of SHA-256:
+  \begin{equation}
+    h'_k = \text{SHA-256}\big(h_{k-1} \mathbin{\Vert} \text{canonical}(B'_k)\big) \ne h_k
+  \end{equation}
+  \item In the subsequent entry $e_{k+1}$, the stored predecessor hash remains $h_k$.
+  \item When the verification routine evaluates block $k+1$:
+  \begin{equation}
+    e_{k+1}.\text{prev\_hash} = h_k \ne h'_k
+  \end{equation}
+  \item The chain verification halts immediately, pinpointing the exact block index of the integrity breach:
+\end{enumerate}
+
+\begin{lstlisting}[language=Python, caption={Chain Integrity Verification Routine (\texttt{services/runtime/audit.py})}]
+def verify_chain_integrity(self) -> Dict[str, Any]:
+    expected_prev = self.GENESIS_HASH
+    for idx, entry in enumerate(self.chain):
+        if entry["prev_hash"] != expected_prev:
+            return {"valid": False, "tampered_at_index": idx, "reason": "Previous hash mismatch"}
+        
+        computed = hashlib.sha256(f"{expected_prev}{canonical_json(entry['body'])}".encode()).hexdigest()
+        if computed != entry["hash"]:
+            return {"valid": False, "tampered_at_index": idx, "reason": "Hash recalculation mismatch"}
+        expected_prev = entry["hash"]
+    return {"valid": True, "entries_count": len(self.chain), "final_hash": expected_prev}
+\end{lstlisting}
+
+This algorithm was rigorously validated in our automated test suite (\texttt{tests/test\_audit\_chain.py}), proving that tampering with any historical parameter (such as modifying an invoice amount from $\$1,200.00$ to $\$99,999.00$) causes an immediate integrity failure.
+
+\subsection{Defense-in-Depth Transaction Idempotency}
+In distributed finance architectures, network timeouts frequently create ambiguity: did a POST request time out before reaching the server, or did it succeed on the server while the response was lost in transit? Retrying naively risks duplicate ledger postings.
+
+CentraOperator implements **three-layer defense-in-depth idempotency**:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Deterministic Cryptographic Key Derivation:} Before issuing an external mutation, the agent computes an idempotency fingerprint:
+  \begin{equation}
+    K_{\text{idem}} = \text{SHA-256}\big(\text{operation} \mathbin{\Vert} \text{vendor} \mathbin{\Vert} \text{invoice\_number}\big)
+  \end{equation}
+  \item \textbf{Distributed Redis Lock with TTL:} The agent attempts an atomic \texttt{SET K\_idem "LOCKED" NX EX 60} in Redis. If the key already exists, the mutation is immediately aborted.
+  \item \textbf{CentraERP Database Unique Composite Index:} The underlying datastore enforces a strict unique constraint on \texttt{(vendor, invoice\_number)}. Any concurrent write is rejected at the database engine level with an HTTP 409 Conflict.
+  \item \textbf{Read-Before-Retry Protocol:} If an ambiguous network error occurs, the agent queries the read-only ERP API first to inspect whether the transaction landed before attempting a re-submission.
+\end{enumerate}

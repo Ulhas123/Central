@@ -1,0 +1,28 @@
+{
+  "id": "sop-ap-approval-limit",
+  "title": "Accounts Payable Approval Limits and Segregation of Duties",
+  "text": "All accounts payable transactions must adhere to strict internal authorization matrices. Invoices with a total amount greater than 5,000 USD require explicit manager approval before posting to the general ledger. Any variance greater than 50 USD between an invoice line item and its referenced Purchase Order must be flagged and approved before submission. System operators must never post unauthorized or unverified invoices.",
+  "rules": [
+    {
+      "applies_to": "invoice_post",
+      "field": "amount",
+      "op": "gt",
+      "value": 5000,
+      "action": "require_approval",
+      "reason": "Invoice amount exceeds standard automatic processing threshold of $5,000 USD"
+    },
+    {
+      "applies_to": "invoice_post",
+      "field": "po_variance",
+      "op": "gt",
+      "value": 50,
+      "action": "require_approval",
+      "reason": "Variance between invoice amount and PO amount exceeds allowable threshold of $50 USD"
+    }
+  ],
+  "required_checks": [
+    "invoice_posted",
+    "amount_matches_source",
+    "no_duplicate"
+  ]
+}

@@ -1,0 +1,110 @@
+\section{Deterministic Policy Gating \& Human-in-the-Loop (HITL)}
+\label{sec:deterministic_gating}
+
+\subsection{Policy as Data, Enforcement as Code}
+In enterprise systems, financial controls, compliance rules, and segregation-of-duties mandates are **deterministic constraints**. For example:
+\begin{itemize}
+  \item Invoices exceeding $\$5,000\text{ USD}$ require explicit Finance Director sign-off.
+  \item Purchase Order amount variance exceeding $\$50\text{ USD}$ must halt automated settlement.
+  \item High-risk operations (such as vendor bank detail modifications or irreversible ledger closures) must never be executed autonomously.
+\end{itemize}
+
+A pervasive architectural anti-pattern in modern AI agent development is attempting to enforce numerical and governance guardrails via prompt engineering (e.g., instructing the system prompt: \textit{``You are a helpful assistant. Never approve an invoice over \$5,000 without asking human permission''}). 
+
+\begin{guardrailbox}[The Fallacy of Prompt-Based Guardrails]
+Large Language Models are probabilistic next-token predictors. As conversation context expands, prompt-based guardrails suffer from **context dilution**, **fuzzy boundary miscalculation** (e.g., confusing \$4,999 with \$5,001 under complex currency formats), and vulnerability to **indirect prompt injection** from ingested vendor documents. In financial systems, a $0.1\%$ probabilistic failure rate represents catastrophic compliance liability.
+\end{guardrailbox}
+
+To guarantee absolute compliance, CentraOperator enforces the principle of **Policy as Data, Enforcement as Code**:
+\begin{enumerate}
+  \item Corporate Standard Operating Procedures (SOPs) are stored in persistent memory as structured data schemas.
+  \item Evaluation of proposed actions against policy schemas is executed **deterministically in native Python code** by the \texttt{gate\_node}.
+  \item The LLM is never consulted to determine whether a policy threshold has been breached.
+\end{enumerate}
+
+\subsection{Structured SOP Schema}
+Corporate policies stored in Qdrant or JSON files define explicit rule specifications:
+
+\begin{lstlisting}[language=Python, caption={Structured SOP Schema with Quantitative Rule Payloads (\texttt{data/sops/sop\_ap\_limits.json})}]
+{
+  "id": "sop-ap-approval-limit",
+  "name": "Standard Accounts Payable Invoice Approval Limits",
+  "domain": "accounts_payable",
+  "rules": [
+    {
+      "applies_to": "post_invoice",
+      "field": "amount",
+      "op": "gt",
+      "value": 5000.0,
+      "action": "require_approval",
+      "reason": "Invoices exceeding $5,000 require managerial authorization."
+    },
+    {
+      "applies_to": "post_invoice",
+      "field": "po_variance",
+      "op": "gt",
+      "value": 50.0,
+      "action": "require_approval",
+      "reason": "PO variance exceeds allowable enterprise tolerance threshold."
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsection{Deterministic Rule Engine Implementation}
+Before any tool execution occurs in \texttt{act\_node}, the state graph routes to \texttt{gate\_node}, which invokes \texttt{evaluate\_rules}:
+
+\begin{lstlisting}[language=Python, caption={Deterministic Policy Evaluator (\texttt{services/runtime/graph/nodes/gate.py})}]
+def evaluate_rules(action: Dict[str, Any], facts: Dict[str, Any], policies: List[Dict[str, Any]]) -> Dict[str, Any]:
+    operation = action.get("operation")
+    risk = action.get("risk", "read")
+    
+    # 1. Hard invariant: Irreversible operations always require human sign-off
+    if risk == "irreversible":
+        return {
+            "needs_approval": True,
+            "reason": "Action is classified as 'irreversible' per enterprise safety manifest",
+            "policy_ids": ["manifest-safety-guardrail"]
+        }
+
+    # 2. Deterministic evaluation of quantitative SOP rules against accumulated facts
+    for policy in policies:
+        for rule in policy.get("rules", []):
+            if rule.get("applies_to") == operation:
+                fact_val = facts.get(rule.get("field"))
+                threshold = rule.get("value")
+                op = rule.get("op")
+                
+                if fact_val is not None:
+                    triggered = False
+                    if op == "gt" and float(fact_val) > float(threshold):
+                        triggered = True
+                    elif op == "gte" and float(fact_val) >= float(threshold):
+                        triggered = True
+                    elif op == "ne" and str(fact_val) != str(threshold):
+                        triggered = True
+
+                    if triggered and rule.get("action") == "require_approval":
+                        return {
+                            "needs_approval": True,
+                            "reason": rule.get("reason"),
+                            "policy_ids": [policy.get("id")]
+                        }
+
+    return {"needs_approval": False, "reason": None, "policy_ids": []}
+\end{lstlisting}
+
+\subsection{The Human-in-the-Loop (HITL) Interrupt Lifecycle}
+When a rule triggers, the runtime initiates a structured HITL interrupt:
+\begin{enumerate}
+  \item The graph updates its status to \texttt{AWAITING\_APPROVAL}.
+  \item It queries \texttt{EpisodicMemoryStore} in Qdrant for institutional precedent regarding similar past approvals (e.g., \textit{``2 prior invoices from this vendor over \$5,000 were approved by Finance Director''}).
+  \item The graph serializes the checkpoint and yields execution.
+  \item The Ingress Gateway broadcasts a \texttt{hitl:interrupt} WebSocket event to the Mission Control React Dashboard.
+  \item The dashboard renders a dedicated **Approval Card** showing the pending mutation, exact policy violation, and precedent summary.
+  \item Upon human action (\textbf{Approve} or \textbf{Reject}):
+    \begin{itemize}
+      \item If \textbf{Approved}: The approval decision and manager notes are injected into state facts, logged into episodic memory, and the graph transitions to \texttt{ACTING}.
+      \item If \textbf{Rejected}: The rejection is appended to the audit log, and the task halts with status \texttt{REJECTED}.
+    \end{itemize}
+\end{enumerate}

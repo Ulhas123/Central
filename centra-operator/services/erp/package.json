@@ -1,0 +1,13 @@
+{
+  "name": "centra-erp",
+  "version": "1.0.0",
+  "description": "Simulated Enterprise ERP web application with server-rendered pages and read-only JSON API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2"
+  }
+}

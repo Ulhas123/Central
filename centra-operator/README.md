@@ -1,6 +1,6 @@
 # CentraOperator: Autonomous Enterprise Company Operator
 
-**Candidate:** Varun Karankar (IIIT Allahabad)  
+**Developed in Collaboration:** Ulhas Karankar & Varun Karankar (IIIT Allahabad)  
 **Role:** Founding Engineer — CentrAlign AI  
 **Domain:** Autonomous Finance & Accounts Payable Operations  
 
@@ -131,8 +131,8 @@ class RunState(TypedDict):
 ## 3. Important Technical & Design Decisions
 
 ### 3.1 Policy as Data, Enforcement as Code
-- **The Problem:** LLMs are probabilistic engines. Asking an LLM in a prompt to "remember not to approve invoices over $5,000" causes catastrophic hallucinations under context pressure.
-- **Our Decision:** Policies stored in Qdrant combine semantic descriptions with **structured rule payloads** (e.g., `{"field": "amount", "op": "gt", "value": 5000, "action": "require_approval"}`). The `gate_node` evaluates these rules deterministically in native code. When triggered, the graph invokes LangGraph's `interrupt()`, checkpoints state, and emits an approval request.
+- **The Problem:** LLMs are probabilistic engines. Asking an LLM in a prompt to "remember not to approve invoices over ₹50,000" causes catastrophic hallucinations under context pressure.
+- **Our Decision:** Policies stored in Qdrant combine semantic descriptions with **structured rule payloads** (e.g., `{"field": "amount", "op": "gt", "value": 50000, "action": "require_approval"}`). The `gate_node` evaluates these rules deterministically in native code. When triggered, the graph invokes LangGraph's `interrupt()`, checkpoints state, and emits an approval request.
 
 ### 3.2 Independent Read-Path Verification (Catching the "Lying UI")
 - **The Problem:** Enterprise web forms frequently return misleading `200 OK` responses or render green "Success" banners even when the database transaction failed or silently rolled back.
@@ -154,7 +154,7 @@ class RunState(TypedDict):
 - **Our Decision:** The LLM only receives opaque credential identifiers (e.g., `credential_ref: "erp_ap_clerk"`). The underlying tool execution layer injects the actual secrets at the network boundary.
 
 ### 3.6 Episodic Memory from Human Feedback
-- Human approval, rejection, and override decisions are embedded and indexed in Qdrant. Future approval requests cite institutional precedent (e.g., *"Past Precedent: Two earlier invoices from Acme Corp exceeding $5,000 were approved by the Finance Director"*), assisting human reviewers without bypassing policy gates.
+- Human approval, rejection, and override decisions are embedded and indexed in Qdrant. Future approval requests cite institutional precedent (e.g., *"Past Precedent: Two earlier invoices from Acme Corp exceeding ₹50,000 were approved by the Finance Director"*), assisting human reviewers without bypassing policy gates.
 
 ### 3.7 Tamper-Evident SHA-256 Audit Chain
 - Every action, observation, gate decision, and verification result is linked in an append-only cryptographic hash chain (`hash = sha256(prev_hash + canonical_json(event))`). Any post-hoc modification to the audit trail immediately breaks integrity verification.
@@ -173,18 +173,18 @@ class RunState(TypedDict):
   > CentraOperator executes an 8-stage cyclical state machine: Goal, Understand, Recall, Plan, Gate, Act, Observe, Adapt, and Verify—anchored by deterministic policy code and independent read-path verification."*
 
 ### Scene 2: Scenario 1 — Autonomous Happy Path (0:35 - 1:15)
-- **Visual:** Click **"1. 🟢 Happy Path: Process Acme invoice ($1,200) & PO match"**. Point cursor at the execution trace as it animates.
+- **Visual:** Click **"1. 🟢 Happy Path: Process Acme invoice (₹12,000) & PO match"**. Point cursor at the execution trace as it animates.
 - **Voiceover:**
   > *"In this first scenario, the operator receives an unscripted goal: 'Process the latest Acme invoice and match it to its PO'.  
-  > First, the agent reads the raw document from the inbox and extracts the vendor, amount ($1,200), and PO number.  
-  > Next, in `Recall`, it queries semantic SOPs from Qdrant and checks financial approval limits. Since $1,200 is below the $5,000 threshold, it passes the Gate automatically.  
+  > First, the agent reads the raw document from the inbox and extracts the vendor, amount (₹12,000), and PO number.  
+  > Next, in `Recall`, it queries semantic SOPs from Qdrant and checks financial approval limits. Since ₹12,000 is below the ₹50,000 threshold, it passes the Gate automatically.  
   > In `Plan` and `Act`, it navigates CentraERP, submits the invoice entry form with CSRF handling, and logs into the portal.  
   > Crucially, look at `Verify`: the agent does NOT trust the web page's success alert. It queries the isolated read-only JSON API using a separate audit token, verifies the record is posted with exact matching amounts, and seals the event into a tamper-evident SHA-256 hash chain."*
 
 ### Scene 3: Scenario 2 — Deterministic Policy Gate & HITL Resumption (1:15 - 2:00)
-- **Visual:** Click **"2. 🟡 Policy Approval: Apex Global ($14,500) triggers HITL Limit Gate"**. Show the execution pause and the interactive Approval Card appear.
+- **Visual:** Click **"2. 🟡 Policy Approval: Apex Global (₹1,45,000) triggers HITL Limit Gate"**. Show the execution pause and the interactive Approval Card appear.
 - **Voiceover:**
-  > *"Now, let's test company policy boundaries. Apex Global submits an invoice for $14,500.  
+  > *"Now, let's test company policy boundaries. Apex Global submits an invoice for ₹1,45,000.  
   > Notice that execution halts immediately at the `Gate` node. This guardrail is not left to LLM chance—our code deterministically evaluated the structured rule schema from `sop_ap_limits.json`.  
   > The graph pauses, checkpoints its state, and pushes an approval card to our dashboard.  
   > Notice the card cites **Episodic Memory**: 'Precedent: Two earlier invoices from this vendor over the limit were approved by the CFO'.  

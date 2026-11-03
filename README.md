@@ -1,6 +1,6 @@
 # CentraOperator: Autonomous Enterprise Company Operator
 
-**Developed in Collaboration:** Ulhas Karankar & Varun Karankar (IIIT Allahabad)  
+**Developed in Collaboration:** Ulhas Karankar & Varun Karankar  
 **Role:** Founding Engineer — CentrAlign AI  
 **Domain:** Autonomous Finance & Accounts Payable Operations  
 
